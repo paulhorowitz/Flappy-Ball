@@ -33,14 +33,44 @@ def check_collision(defender_list):
 
     return True
 
+def rotate_ball(ball):
+    new_ball = pygame.transform.rotozoom(ball, ball_movement * 1.5, 1)
+    return new_ball
+
+def ball_animation():
+    new_ball = ball_frames[ball_index]
+    new_ball_rect = new_ball.get_rect(center = (100, ball_rect.centery))
+    return new_ball, new_ball_rect
+
+def score_display(game_state):
+    if game_state == 'main_game':
+        score_surface = game_font.render(f'Score: {(int(score))}', True, [255,255,255])
+        score_rect = score_surface.get_rect(center=(288, 100))
+        screen.blit(score_surface, score_rect)
+    if game_state == 'game_over':
+        score_surface = game_font.render(f'Score: {(int(score))}', True, [255,255,255])
+        score_rect = score_surface.get_rect(center=(288, 100))
+        screen.blit(score_surface, score_rect)
+
+        high_score_surface = game_font.render(f'High Score: {(int(high_score))}', True, [255,255,255])
+        high_score_rect = high_score_surface.get_rect(center=(288, 850))
+        screen.blit(high_score_surface, high_score_rect)
+
+def update_score(score, high_score):
+    if score > high_score:
+        high_score = score
+    return high_score
 pygame.init()
 screen = pygame.display.set_mode((576, 1024))
 clock = pygame.time.Clock()
+game_font = pygame.font.Font('04b_19.ttf',40)
 
 # Game Variables
 gravity = 0.25
 ball_movement = 0
 game_active = True
+score = -1
+high_score = 0
 
 bg_surface = pygame.image.load('assets/background-day.png').convert()
 floor_surface = pygame.image.load('assets/base.png').convert()
@@ -49,12 +79,25 @@ floor_surface = pygame.transform.scale2x(floor_surface)
 floor_surface2 = floor_surface
 floor_x_pos = 0
 
-ball_surface = pygame.image.load('assets/basketball_trans.png')
-#ball_surface = pygame.transform.scale2x(ball_surface)
+ball_downflap = pygame.transform.scale2x(pygame.image.load('assets/basketball_trans_downflap.png').convert_alpha())
+ball_midflap = pygame.transform.scale2x(pygame.image.load('assets/basketball_trans_midflap.png').convert_alpha())
+ball_upflap = pygame.transform.scale2x(pygame.image.load('assets/basketball_trans_upflap.png').convert_alpha())
+ball_frames = [ball_downflap, ball_midflap, ball_upflap]
+ball_index = 0
+ball_surface = ball_frames[ball_index]
 ball_rect = ball_surface.get_rect(center=(100, 512))
 
+BALLFLAP = pygame.USEREVENT + 1
+pygame.time.set_timer(BALLFLAP, 200)
+
+#ball_surface = pygame.image.load('assets/basketball_trans.png').convert_alpha()
+#ball_surface = pygame.transform.scale2x(ball_surface)
+#ball_rect = ball_surface.get_rect(center=(100, 512))
+#ball_mask = pygame.mask.from_surface(ball_surface)
+
 defender_surface = pygame.image.load('assets/flappy-ball-defender2.png')
-#defender_surface = pygame.transform.scale2x(defender_surface)
+defender_surface = pygame.transform.scale2x(defender_surface)
+defender_mask = pygame.transform.scale2x(defender_surface)
 defender_list = []
 SPAWNDEFENDER = pygame.USEREVENT
 pygame.time.set_timer(SPAWNDEFENDER, 1200)
@@ -74,10 +117,18 @@ while True:
                 defender_list.clear()
                 ball_rect.center = (100, 512)
                 ball_movement = 0
-
+                score = 0
 
         if event.type == SPAWNDEFENDER:
             defender_list.extend(create_defender())
+
+        if event.type == BALLFLAP:
+            if ball_index < 2:
+                ball_index += 1
+            else:
+                ball_index = 0
+
+            ball_surface, ball_rect = ball_animation()
 
     if game_active:
 
@@ -86,14 +137,19 @@ while True:
         # Bird
 
         ball_movement += gravity
+        rotated_ball = rotate_ball(ball_surface)
         ball_rect.centery += ball_movement
-        screen.blit(ball_surface, ball_rect)
+        screen.blit(rotated_ball, ball_rect)
         game_active = check_collision(defender_list)
 
         # Defender
         defender_list = move_defender(defender_list)
         drawdefender(defender_list)
-
+        score += 0.0069
+        score_display('main_game')
+    else:
+        high_score = update_score(score, high_score)
+        score_display('game_over')
     # Floor
     floor_x_pos -= 1
     draw_floor()
