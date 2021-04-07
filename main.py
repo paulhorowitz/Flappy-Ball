@@ -13,7 +13,8 @@ def create_defender():
 def move_defender(defender_list):
     for defender in defender_list:
         defender.centerx -= 5
-    return defender_list
+    visible_defenders = [defender for defender in defender_list if defender.right > -50]
+    return visible_defenders
 
 def drawdefender(defender_list):
     for defender in defender_list:
@@ -24,11 +25,14 @@ def drawdefender(defender_list):
             screen.blit(flip_defender, defender)
 
 def check_collision(defender_list):
+    global can_score
     for defender in defender_list:
         if ball_rect.colliderect(defender):
+            death_sound.play()
             return False
 
     if ball_rect.top <= -100 or ball_rect.bottom >= 900:
+        can_score = True
         return False
 
     return True
@@ -60,6 +64,17 @@ def update_score(score, high_score):
     if score > high_score:
         high_score = score
     return high_score
+
+def defender_score_check():
+    global score, can_score
+    if defender_list:
+        for defender in defender_list:
+            if 95 < defender.centerx < 105 and can_score:
+                score += 1
+                can_score = False
+            if defender.centerx < 0:
+                can_score = True
+
 pygame.init()
 screen = pygame.display.set_mode((576, 1024))
 clock = pygame.time.Clock()
@@ -69,8 +84,9 @@ game_font = pygame.font.Font('04b_19.ttf',40)
 gravity = 0.25
 ball_movement = 0
 game_active = True
-score = -1
+score = 0
 high_score = 0
+can_score = True
 
 bg_surface = pygame.image.load('assets/background-day.png').convert()
 floor_surface = pygame.image.load('assets/base.png').convert()
@@ -103,7 +119,18 @@ SPAWNDEFENDER = pygame.USEREVENT
 pygame.time.set_timer(SPAWNDEFENDER, 1200)
 defender_height = [400, 600, 800]
 
+game_over_surface = pygame.transform.scale2x(pygame.image.load('assets/messageball.png').convert_alpha())
+game_over_rect = game_over_surface.get_rect(center=(288, 512))
+
+flap_sound = pygame.mixer.Sound('assets/audio/wing.wav')
+death_sound = pygame.mixer.Sound('assets/audio/rejected.wav')
+score_sound = pygame.mixer.Sound('assets/audio/point.wav')
+score_sound_countdown = 100
+
 while True:
+
+    screen.blit(bg_surface, (0, 0))
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -112,6 +139,7 @@ while True:
             if event.key == pygame.K_SPACE and game_active == True:
                 ball_movement = 0
                 ball_movement -= 12
+                flap_sound.play()
             if event.type == pygame.KEYDOWN and game_active == False:
                 game_active = True
                 defender_list.clear()
@@ -132,10 +160,7 @@ while True:
 
     if game_active:
 
-        screen.blit(bg_surface, (0, 0))
-
-        # Bird
-
+        # Ball
         ball_movement += gravity
         rotated_ball = rotate_ball(ball_surface)
         ball_rect.centery += ball_movement
@@ -145,11 +170,16 @@ while True:
         # Defender
         defender_list = move_defender(defender_list)
         drawdefender(defender_list)
-        score += 0.0069
+
+        # Score
+        defender_score_check()
         score_display('main_game')
+
     else:
+        screen.blit(game_over_surface, game_over_rect)
         high_score = update_score(score, high_score)
         score_display('game_over')
+
     # Floor
     floor_x_pos -= 1
     draw_floor()
